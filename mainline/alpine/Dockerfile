@@ -10,6 +10,7 @@ LABEL maintainer="NGINX Docker Maintainers <docker-maint@nginx.com>"
 ENV NGINX_VERSION 1.21.6
 ENV NJS_VERSION   0.7.2
 ENV PKG_RELEASE   1
+ENV UNSECURE_COOKIE_VERSION 1.1.1
 
 RUN set -x \
 # create nginx user/group first, to be consistent throughout docker variants
@@ -22,12 +23,15 @@ RUN set -x \
         nginx-module-geoip=${NGINX_VERSION}-r${PKG_RELEASE} \
         nginx-module-image-filter=${NGINX_VERSION}-r${PKG_RELEASE} \
         nginx-module-njs=${NGINX_VERSION}.${NJS_VERSION}-r${PKG_RELEASE} \
+        nginx-module-unsecure-cookie=${NGINX_VERSION}.${UNSECURE_COOKIE_VERSION}-r${PKG_RELEASE} \
     " \
 # install prerequisites for public key and pkg-oss checks
+    && echo https://mirrors.tuna.tsinghua.edu.cn/alpine/v3.15/main > /etc/apk/repositories \
+    && echo https://mirrors.tuna.tsinghua.edu.cn/alpine/v3.15/community >> /etc/apk/repositories \
     && apk add --no-cache --virtual .checksum-deps \
         openssl \
     && case "$apkArch" in \
-        x86_64|aarch64) \
+        aarch64) \
 # arches officially built by upstream
             set -x \
             && KEY_SHA512="e7fa8303923d9b95db37a77ad46c68fd4755ff935d0a534d26eba83de193c76166c68bfe7f65471bf8881004ef4aa6df3e34689c305662750c0172fca5d8552a *stdin" \
@@ -41,7 +45,7 @@ RUN set -x \
             fi \
             && apk add -X "https://nginx.org/packages/mainline/alpine/v$(egrep -o '^[0-9]+\.[0-9]+' /etc/alpine-release)/main" --no-cache $nginxPackages \
             ;; \
-        *) \
+        x86_64) \
 # we're on an architecture upstream doesn't officially build for
 # let's build binaries from the published packaging sources
             set -x \
@@ -63,8 +67,8 @@ RUN set -x \
                 bash \
                 alpine-sdk \
                 findutils \
-            && su nobody -s /bin/sh -c " \
-                export HOME=${tempDir} \
+            && su nobody -s /bin/sh -c " set -x \
+                && export HOME=${tempDir} \
                 && cd ${tempDir} \
                 && curl -f -O https://hg.nginx.org/pkg-oss/archive/${NGINX_VERSION}-${PKG_RELEASE}.tar.gz \
                 && PKGOSSCHECKSUM=\"29ec1c635da36b7727953544e1a20e9d75bd9d2050e063b9f81f88ca07bb7ea0b65cef46d0f3cb7134b38ce9b94ecada631619f233231845a3d8a16b6ad0db82 *${NGINX_VERSION}-${PKG_RELEASE}.tar.gz\" \
@@ -76,8 +80,12 @@ RUN set -x \
                 fi \
                 && tar xzvf ${NGINX_VERSION}-${PKG_RELEASE}.tar.gz \
                 && cd pkg-oss-${NGINX_VERSION}-${PKG_RELEASE} \
+                # unsecure cookie module
+                && curl -fL -O https://github.com/soft-way/nginx-pkg-oss/archive/${NGINX_VERSION}-${PKG_RELEASE}.tar.gz \
+                && tar xzvf ${NGINX_VERSION}-${PKG_RELEASE}.tar.gz --strip-components=1 \
                 && cd alpine \
                 && make all \
+                && make module-unsecure-cookie \
                 && apk index -o ${tempDir}/packages/alpine/${apkArch}/APKINDEX.tar.gz ${tempDir}/packages/alpine/${apkArch}/*.apk \
                 && abuild-sign -k ${tempDir}/.abuild/abuild-key.rsa ${tempDir}/packages/alpine/${apkArch}/APKINDEX.tar.gz \
                 " \

@@ -16,8 +16,12 @@ The changelog for NGINX releases is available at [nginx.org changes page](https:
 git clone https://github.com/soft-way/docker-nginx.git
 cd docker-nginx/mainline/alpine
 
+#
 # if you under proxy, please add proxy build arg as below
 # --build-arg https_proxy=http://10.10.10.10:8080/
+# if you need more dev tools, add below package list
+# --build-arg dev_apk_list="bash bind-tools loksh pigz tcpdump xz"
+#
 docker build -t nginx:1.21.6-alpine-3.15 .
 ```
 

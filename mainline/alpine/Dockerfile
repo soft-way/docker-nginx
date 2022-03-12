@@ -6,28 +6,19 @@
 FROM alpine:3.15
 
 LABEL maintainer="NGINX Docker Maintainers <docker-maint@nginx.com>"
+LABEL description="Modified by Samuel Chen for building additional modules"
 
 ENV NGINX_VERSION 1.21.6
-ENV NJS_VERSION   0.7.2
 ENV PKG_RELEASE   1
-ENV UNSECURE_COOKIE_VERSION 1.1.1
+
+ARG dev_apk_list
 
 RUN set -x \
 # create nginx user/group first, to be consistent throughout docker variants
     && addgroup -g 101 -S nginx \
     && adduser -S -D -H -u 101 -h /var/cache/nginx -s /sbin/nologin -G nginx -g nginx nginx \
     && apkArch="$(cat /etc/apk/arch)" \
-    && nginxPackages=" \
-        nginx=${NGINX_VERSION}-r${PKG_RELEASE} \
-        nginx-module-xslt=${NGINX_VERSION}-r${PKG_RELEASE} \
-        nginx-module-geoip=${NGINX_VERSION}-r${PKG_RELEASE} \
-        nginx-module-image-filter=${NGINX_VERSION}-r${PKG_RELEASE} \
-        nginx-module-njs=${NGINX_VERSION}.${NJS_VERSION}-r${PKG_RELEASE} \
-        nginx-module-unsecure-cookie=${NGINX_VERSION}.${UNSECURE_COOKIE_VERSION}-r${PKG_RELEASE} \
-    " \
 # install prerequisites for public key and pkg-oss checks
-    && echo https://mirrors.tuna.tsinghua.edu.cn/alpine/v3.15/main > /etc/apk/repositories \
-    && echo https://mirrors.tuna.tsinghua.edu.cn/alpine/v3.15/community >> /etc/apk/repositories \
     && apk add --no-cache --virtual .checksum-deps \
         openssl \
     && case "$apkArch" in \
@@ -52,21 +43,40 @@ RUN set -x \
             && tempDir="$(mktemp -d)" \
             && chown nobody:nobody $tempDir \
             && apk add --no-cache --virtual .build-deps \
+                alpine-sdk \
+                autoconf \
+                automake \
+                bind-tools \
+                bison \
+                boost-dev \
+                cmake \
+                findutils \
+                flex \
                 gcc \
-                libc-dev \
-                make \
-                openssl-dev \
-                pcre2-dev \
-                zlib-dev \
-                linux-headers \
-                libxslt-dev \
                 gd-dev \
                 geoip-dev \
-                perl-dev \
+                libc-dev \
                 libedit-dev \
-                bash \
-                alpine-sdk \
-                findutils \
+                libmaxminddb-dev \
+                libtool \
+                libxslt-dev \
+                linux-headers \
+		krb5-dev \
+                make \
+                openssl-dev \
+                patchelf \
+                pcre \
+                pcre-dev \
+                pcre2 \
+                pcre2-dev \
+                perl-dev \
+                ruby \
+                ruby-rake \
+                yaml-cpp \
+                yaml-cpp-dev \
+                xz \
+                xz-dev \
+                zlib-dev \
             && su nobody -s /bin/sh -c " set -x \
                 && export HOME=${tempDir} \
                 && cd ${tempDir} \
@@ -80,18 +90,25 @@ RUN set -x \
                 fi \
                 && tar xzvf ${NGINX_VERSION}-${PKG_RELEASE}.tar.gz \
                 && cd pkg-oss-${NGINX_VERSION}-${PKG_RELEASE} \
-                # unsecure cookie module
+                # build scripts for unsecure cookie module
                 && curl -fL -O https://github.com/soft-way/nginx-pkg-oss/archive/${NGINX_VERSION}-${PKG_RELEASE}.tar.gz \
                 && tar xzvf ${NGINX_VERSION}-${PKG_RELEASE}.tar.gz --strip-components=1 \
                 && cd alpine \
+                && sed -i.orig 's/BASE_MODULES=.*/BASE_MODULES= auth-spnego brotli encrypted-session fips-check geoip geoip2 \
+                   headers-more image-filter lua modsecurity ndk njs opentracing passenger perl rtmp set-misc subs-filter xslt/g' Makefile \
                 && make all \
-                && make module-unsecure-cookie \
                 && apk index -o ${tempDir}/packages/alpine/${apkArch}/APKINDEX.tar.gz ${tempDir}/packages/alpine/${apkArch}/*.apk \
                 && abuild-sign -k ${tempDir}/.abuild/abuild-key.rsa ${tempDir}/packages/alpine/${apkArch}/APKINDEX.tar.gz \
                 " \
             && cp ${tempDir}/.abuild/abuild-key.rsa.pub /etc/apk/keys/ \
             && apk del .build-deps \
-            && apk add -X ${tempDir}/packages/alpine/ --no-cache $nginxPackages \
+            && for p in `ls ${tempDir}/packages/alpine/${apkArch}`; do \
+		 pkg_name=`echo $p | sed 's/-[0-9].*//g' | grep -v dbg`; \
+		 if [ -n "$pkg_name" ]; then \
+                   apk add -X ${tempDir}/packages/alpine/ --no-cache $pkg_name; \
+                 fi \
+               done \
+            && if [ -n "$dev_apk_list" ]; then apk add --no-cache $dev_apk_list; fi \
             ;; \
     esac \
 # remove checksum deps

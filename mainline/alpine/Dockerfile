@@ -61,7 +61,7 @@ RUN set -x \
                 libtool \
                 libxslt-dev \
                 linux-headers \
-		krb5-dev \
+                krb5-dev \
                 make \
                 openssl-dev \
                 patchelf \
@@ -95,7 +95,8 @@ RUN set -x \
                 && tar xzvf ${NGINX_VERSION}-${PKG_RELEASE}.tar.gz --strip-components=1 \
                 && cd alpine \
                 && sed -i.orig 's/BASE_MODULES=.*/BASE_MODULES= auth-spnego brotli encrypted-session fips-check geoip geoip2 \
-                   headers-more image-filter lua modsecurity ndk njs opentracing passenger perl rtmp set-misc subs-filter xslt/g' Makefile \
+                   headers-more image-filter lua modsecurity ndk njs opentracing passenger perl rtmp set-misc subs-filter \
+                   unsecure-cookie xslt/g' Makefile \
                 && make all \
                 && apk index -o ${tempDir}/packages/alpine/${apkArch}/APKINDEX.tar.gz ${tempDir}/packages/alpine/${apkArch}/*.apk \
                 && abuild-sign -k ${tempDir}/.abuild/abuild-key.rsa ${tempDir}/packages/alpine/${apkArch}/APKINDEX.tar.gz \

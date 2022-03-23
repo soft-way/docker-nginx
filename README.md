@@ -21,6 +21,8 @@ cd docker-nginx/mainline/alpine
 # --build-arg https_proxy=http://10.10.10.10:8080/
 # if you need more dev tools, add below package list
 # --build-arg dev_apk_list="bash bind-tools loksh pigz tcpdump xz"
+# if you want to enable debug log, add below arg
+# --build-arg debug=yes
 #
 docker build -t nginx:1.21.6-alpine-3.15 .
 ```

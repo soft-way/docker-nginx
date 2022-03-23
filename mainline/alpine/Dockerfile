@@ -12,6 +12,7 @@ ENV NGINX_VERSION 1.21.6
 ENV PKG_RELEASE   1
 
 ARG dev_apk_list
+ARG debug
 
 RUN set -x \
 # create nginx user/group first, to be consistent throughout docker variants
@@ -97,6 +98,9 @@ RUN set -x \
                 && sed -i.orig 's/BASE_MODULES=.*/BASE_MODULES= auth-spnego brotli encrypted-session fips-check geoip geoip2 \
                    headers-more image-filter lua modsecurity ndk njs opentracing passenger perl rtmp set-misc subs-filter \
                    unsecure-cookie xslt/g' Makefile \
+                && if [ "$debug" = "yes" ]; then \
+                     sed -i 's/BASE_CONFIGURE_ARGS=/BASE_CONFIGURE_ARGS=--with-debug /g' Makefile; \
+                   fi \
                 && make all \
                 && apk index -o ${tempDir}/packages/alpine/${apkArch}/APKINDEX.tar.gz ${tempDir}/packages/alpine/${apkArch}/*.apk \
                 && abuild-sign -k ${tempDir}/.abuild/abuild-key.rsa ${tempDir}/packages/alpine/${apkArch}/APKINDEX.tar.gz \
